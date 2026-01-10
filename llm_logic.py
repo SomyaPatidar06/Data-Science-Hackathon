@@ -30,10 +30,41 @@ generation_config = {
   "response_mime_type": "application/json",
 }
 
-model = genai.GenerativeModel(
-  model_name="gemini-1.5-flash",
-  generation_config=generation_config,
-)
+# Auto-Discovery of Working Model
+_ACTIVE_MODEL = None
+
+def get_working_model():
+    global _ACTIVE_MODEL
+    if _ACTIVE_MODEL:
+        return _ACTIVE_MODEL
+
+    candidates = [
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-pro",
+        "gemini-1.0-pro"
+    ]
+    
+    logging.info("Starting Auto-Discovery for Working Gemini Model...")
+    
+    for model_name in candidates:
+        try:
+            logging.info(f"Testing model: {model_name}...")
+            test_model = genai.GenerativeModel(
+                model_name=model_name,
+                generation_config=generation_config
+            )
+            # Dry run to check if it exists/is accessible
+            test_model.generate_content("Hello") 
+            logging.info(f"SUCCESS: Found working model: {model_name}")
+            _ACTIVE_MODEL = test_model
+            return _ACTIVE_MODEL
+        except Exception as e:
+            logging.warning(f"Failed to load {model_name}: {e}")
+            
+    # If all fail:
+    logging.error("CRITICAL: All model candidates failed.")
+    raise RuntimeError("No available Gemini models found. Check API Key and Region.")
 
 def check_consistency_llm(book_text_snippet, character, backstory):
     """
@@ -78,7 +109,9 @@ def check_consistency_llm(book_text_snippet, character, backstory):
     retries = 3
     for attempt in range(retries):
         try:
-            response = model.generate_content(prompt)
+            # Retrieve model dynamically (handles caching internally)
+            model_instance = get_working_model()
+            response = model_instance.generate_content(prompt)
             # Cleanup: sometimes API returns ```json ... ``` despite instructions
             raw_text = response.text
             clean_text = raw_text.strip()
