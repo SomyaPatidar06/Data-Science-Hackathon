@@ -1,6 +1,7 @@
 
 import pathway as pw
 import os
+import logging
 from llm_logic import check_consistency_llm
 
 # --- Configuration ---
@@ -9,23 +10,33 @@ DATA_DIR = "./DataSet/Dataset"  # Based on git structure
 BOOKS_DIR = os.path.join(DATA_DIR, "Books")
 INPUT_CSV = os.path.join(DATA_DIR, "train.csv") 
 OUTPUT_CSV = "results.csv"
+LOG_FILE = "app.log"
+
+# --- Logging Setup ---
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filemode='w' # Overwrite each run
+)
+print(f"Logging to {LOG_FILE}...")
 
 # --- Pre-load Books into Memory ---
-print("Loading books into memory...")
+logging.info("Loading books into memory...")
 books_content = {}
 
 # Debugging: Print current directory and list files
-print(f"Current Working Directory: {os.getcwd()}")
+logging.info(f"Current Working Directory: {os.getcwd()}")
 if os.path.exists(DATA_DIR):
-    print(f"Found Data Directory: {DATA_DIR}")
+    logging.info(f"Found Data Directory: {DATA_DIR}")
 else:
-    print(f"WARNING: Data Directory NOT found at {DATA_DIR}")
+    logging.warning(f"Data Directory NOT found at {DATA_DIR}")
     # Fallback to try finding it
     if os.path.exists("./dataset/Dataset"):
         DATA_DIR = "./dataset/Dataset"
         BOOKS_DIR = os.path.join(DATA_DIR, "Books")
         INPUT_CSV = os.path.join(DATA_DIR, "train.csv")
-        print(f"Fallback: Found Data Directory at {DATA_DIR}")
+        logging.info(f"Fallback: Found Data Directory at {DATA_DIR}")
 
 if os.path.exists(BOOKS_DIR):
     for filename in os.listdir(BOOKS_DIR):
@@ -35,30 +46,30 @@ if os.path.exists(BOOKS_DIR):
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     books_content[book_name] = f.read()
-                print(f"Loaded: {book_name}")
+                logging.info(f"Loaded: {book_name}")
             except Exception as e:
-                print(f"Failed to load {filename}: {e}")
+                logging.error(f"Failed to load {filename}: {e}")
 else:
-    print(f"WARNING: Books directory not found at {BOOKS_DIR}")
+    logging.error(f"Books directory not found at {BOOKS_DIR}")
 
 # --- Helper Function (Regular Python) ---
 def process_row(book_name, character, backstory):
     """
     Standard Python function to process each row.
     """
-    print(f"DEBUG: Processing row for book='{book_name}', char='{character}'")
+    logging.info(f"Processing row for book='{book_name}', char='{character}'")
     
     context = books_content.get(book_name, "")
     if not context:
-        print(f"ERROR: Book not found '{book_name}'")
+        logging.error(f"Book not found '{book_name}'")
         return (0, f"Book '{book_name}' not found in loaded data ({list(books_content.keys())})")
     
     if not backstory:
-        print("ERROR: No backstory")
+        logging.error("No backstory")
         return (0, "No backstory provided.")
         
     result = check_consistency_llm(context, character, backstory)
-    print(f"DEBUG: Result for '{character}': {result.get('prediction')}")
+    logging.info(f"Result for '{character}': {result.get('prediction')}")
     return (result.get("prediction", 0), result.get("rationale", ""))
 
 # --- Pathway Pipeline ---
