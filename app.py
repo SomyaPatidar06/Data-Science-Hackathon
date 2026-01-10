@@ -41,12 +41,13 @@ else:
 if os.path.exists(BOOKS_DIR):
     for filename in os.listdir(BOOKS_DIR):
         if filename.endswith(".txt"):
-            book_name = filename.replace(".txt", "")
+            # Normalize to lowercase for robust matching
+            book_name = filename.replace(".txt", "").strip().lower()
             path = os.path.join(BOOKS_DIR, filename)
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     books_content[book_name] = f.read()
-                logging.info(f"Loaded: {book_name}")
+                logging.info(f"Loaded: {book_name} (from {filename})")
             except Exception as e:
                 logging.error(f"Failed to load {filename}: {e}")
 else:
@@ -59,10 +60,15 @@ def process_row(book_name, character, backstory):
     """
     logging.info(f"Processing row for book='{book_name}', char='{character}'")
     
-    context = books_content.get(book_name, "")
+    # Normalize lookup
+    lookup_name = str(book_name).strip().lower()
+    context = books_content.get(lookup_name, "")
+    
     if not context:
-        logging.error(f"Book not found '{book_name}'")
-        return (0, f"Book '{book_name}' not found in loaded data ({list(books_content.keys())})")
+        logging.error(f"Book not found '{book_name}' (Looked for: '{lookup_name}')")
+        logging.info(f"Available books: {list(books_content.keys())}")
+        return (0, f"Book '{book_name}' not found.")
+
     
     if not backstory:
         logging.error("No backstory")
