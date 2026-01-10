@@ -66,8 +66,9 @@ def run_pipeline():
     )
 
     # 2. Apply the LLM processing using pw.apply
+    # Renaming 'id' to 'record_id' because 'id' is reserved in Pathway
     processed = ds.select(
-        id=ds.id,
+        record_id=ds.id, 
         label=ds.label,
         book_name=ds.book_name,
         prediction_tuple=pw.apply(process_row, ds.book_name, ds.char, ds.content)
@@ -75,7 +76,7 @@ def run_pipeline():
     
     # 3. Flatten the tuple result
     final_table = processed.select(
-        id=processed.id,
+        record_id=processed.record_id,
         book_name=processed.book_name,
         original_label=processed.label,
         enc=processed.prediction_tuple[0],
