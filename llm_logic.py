@@ -2,6 +2,7 @@
 import os
 import time
 import json
+import logging
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -85,7 +86,7 @@ def check_consistency_llm(book_text_snippet, character, backstory):
             
             return json.loads(clean_text)
         except Exception as e:
-            print(f"Error calling Gemini (Attempt {attempt+1}/{retries}): {e}")
+            logging.error(f"Error calling Gemini (Attempt {attempt+1}/{retries}): {e}")
             time.sleep(2 * (attempt + 1))
             
     # Fallback on failure
