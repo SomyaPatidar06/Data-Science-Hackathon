@@ -91,6 +91,17 @@ def check_consistency_llm(book_text_snippet, character, backstory):
             return json.loads(clean_text)
         except Exception as e:
             logging.error(f"Error calling Gemini (Attempt {attempt+1}/{retries}): {e}")
+            
+            # DEBUG: List available models to find the right name
+            try:
+                logging.info("--- Available Models ---")
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        logging.info(f"Model: {m.name}")
+                logging.info("------------------------")
+            except Exception as list_e:
+                logging.error(f"Could not list models: {list_e}")
+
             time.sleep(2 * (attempt + 1))
             
     # Fallback on failure
