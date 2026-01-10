@@ -74,7 +74,16 @@ def check_consistency_llm(book_text_snippet, character, backstory):
     for attempt in range(retries):
         try:
             response = model.generate_content(prompt)
-            return json.loads(response.text)
+            # Cleanup: sometimes API returns ```json ... ``` despite instructions
+            raw_text = response.text
+            clean_text = raw_text.strip()
+            if clean_text.startswith("```"):
+                import re
+                match = re.search(r"```(?:json)?\s*(.*)\s*```", clean_text, re.DOTALL)
+                if match:
+                    clean_text = match.group(1)
+            
+            return json.loads(clean_text)
         except Exception as e:
             print(f"Error calling Gemini (Attempt {attempt+1}/{retries}): {e}")
             time.sleep(2 * (attempt + 1))
