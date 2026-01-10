@@ -12,9 +12,13 @@ load_dotenv()
 # Configure Gemini
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
-    # Fallback for when running on local dev logic if env not set
-    pass 
+    api_key = os.getenv("GOOGLE_API_KEY")
+
+if not api_key:
+    logging.error("CRITICAL: No API Key found! Please set GEMINI_API_KEY or GOOGLE_API_KEY.")
 else:
+    # distinct last 4 chars for verification
+    logging.info(f"Configuring Gemini with API Key ending in '...{api_key[-4:]}'")
     genai.configure(api_key=api_key)
 
 # Generation Config
