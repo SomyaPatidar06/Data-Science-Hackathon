@@ -46,14 +46,19 @@ def process_row(book_name, character, backstory):
     """
     Standard Python function to process each row.
     """
+    print(f"DEBUG: Processing row for book='{book_name}', char='{character}'")
+    
     context = books_content.get(book_name, "")
     if not context:
+        print(f"ERROR: Book not found '{book_name}'")
         return (0, f"Book '{book_name}' not found in loaded data ({list(books_content.keys())})")
     
     if not backstory:
+        print("ERROR: No backstory")
         return (0, "No backstory provided.")
         
     result = check_consistency_llm(context, character, backstory)
+    print(f"DEBUG: Result for '{character}': {result.get('prediction')}")
     return (result.get("prediction", 0), result.get("rationale", ""))
 
 # --- Pathway Pipeline ---
