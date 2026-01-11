@@ -50,10 +50,22 @@ generation_config = {
 
 # Auto-Discovery of Working Model
 _ACTIVE_MODEL = None
+_RESOLVED_MODEL_NAME = None
 
 def get_working_model():
-    global _ACTIVE_MODEL
+    global _ACTIVE_MODEL, _RESOLVED_MODEL_NAME
+    
+    # 1. If we have a live instance, use it
     if _ACTIVE_MODEL:
+        return _ACTIVE_MODEL
+
+    # 2. If we know the model name from before, just rebuild it (Skip Discovery)
+    if _RESOLVED_MODEL_NAME:
+        # logging.info(f"Rebuilding client for known model: {_RESOLVED_MODEL_NAME}")
+        _ACTIVE_MODEL = genai.GenerativeModel(
+            model_name=_RESOLVED_MODEL_NAME,
+            generation_config=generation_config
+        )
         return _ACTIVE_MODEL
 
     candidates = [
@@ -85,6 +97,7 @@ def get_working_model():
             test_model.generate_content("Hello") 
             logging.info(f"SUCCESS: Found working model: {model_name}")
             _ACTIVE_MODEL = test_model
+            _RESOLVED_MODEL_NAME = model_name
             return _ACTIVE_MODEL
         except Exception as e:
             # If we get a Quota error (429), the model EXISTS! We just hit a limit.
@@ -93,6 +106,7 @@ def get_working_model():
                 logging.info(f"SUCCESS (Quota Hit): Found working model: {model_name}. Pausing 60s...")
                 time.sleep(60)
                 _ACTIVE_MODEL = test_model
+                _RESOLVED_MODEL_NAME = model_name
                 return _ACTIVE_MODEL
             
             logging.warning(f"Failed to load {model_name}: {e}")
