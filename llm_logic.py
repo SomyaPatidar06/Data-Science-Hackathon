@@ -139,7 +139,10 @@ def check_consistency_llm(book_text_snippet, character, backstory):
     }}
     """
     
-    retries = 3
+    # Track rotations for this specific call
+    rotations_this_call = 0
+    
+    retries = 10 # Increase retries to allow full rotation
     for attempt in range(retries):
         try:
             # Retrieve model dynamically (handles caching internally)
@@ -156,17 +159,24 @@ def check_consistency_llm(book_text_snippet, character, backstory):
             
             return json.loads(clean_text)
         except Exception as e:
-            logging.error(f"Error calling Gemini (Attempt {attempt+1}/{retries}): {e}")
+            logging.error(f"Error calling Gemini (Key ...{get_current_key()[-4:]}): {e}")
             
             # If Quota Exceeded (429), ROTATE KEY and RETRY immediately!
             if "429" in str(e) or "Quota" in str(e) or "quota" in str(e):
-                logging.warning(f"⚠️ Quota Hit on Key #{current_key_index % len(API_KEY_POOL) + 1}!")
+                logging.warning(f"⚠️ Quota Hit at index {current_key_index}!")
                 
-                # If we have multiple keys, rotate and retry INSTANTLY
+                # Check for "Total Exhaustion" (We rotated through ALL keys and they are ALL dead)
+                rotations_this_call += 1
+                
                 if len(API_KEY_POOL) > 1:
-                    rotate_key()
-                    # Don't sleep long, just enough to switch
-                    time.sleep(1) 
+                    # If we tried every key in the pool, we MUST sleep
+                    if rotations_this_call >= len(API_KEY_POOL):
+                        logging.warning("🛑 ALL KEYS EXHAUSTED! Pool needs recharge. Sleeping 60s...")
+                        time.sleep(60)
+                        rotations_this_call = 0 # Reset counter after sleep
+                    else:
+                        rotate_key()
+                        time.sleep(1) 
                 else:
                     # If we only have 1 key, we MUST sleep
                     logging.warning("🚫 No other keys to switch to. Sleeping 65s...")
