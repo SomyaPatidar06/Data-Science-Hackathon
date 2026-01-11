@@ -26,11 +26,13 @@ def get_current_key():
     return API_KEY_POOL[current_key_index % len(API_KEY_POOL)]
 
 def rotate_key():
-    global current_key_index
+    global current_key_index, _ACTIVE_MODEL
     current_key_index += 1
     new_key = get_current_key()
     logging.info(f"🔄 Rotating to API Key #{current_key_index % len(API_KEY_POOL) + 1} (Ends in ...{new_key[-4:]})")
     genai.configure(api_key=new_key)
+    # CRITICAL: Force model reload with new credentials
+    _ACTIVE_MODEL = None
     return new_key
 
 # Configure initial key
