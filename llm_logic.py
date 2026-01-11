@@ -9,17 +9,33 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Configure Gemini
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    api_key = os.getenv("GOOGLE_API_KEY")
+# --- API Key Management (Rotation) ---
+# Load ALL keys (split by comma) to create a pool
+raw_keys = os.getenv("GEMINI_API_KEYS") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
+API_KEY_POOL = [k.strip() for k in raw_keys.split(",") if k.strip()]
+current_key_index = 0
 
-if not api_key:
-    logging.error("CRITICAL: No API Key found! Please set GEMINI_API_KEY or GOOGLE_API_KEY.")
+if not API_KEY_POOL:
+    logging.error("No API Keys found in environment!")
 else:
-    # distinct last 4 chars for verification
-    logging.info(f"Configuring Gemini with API Key ending in '...{api_key[-4:]}'")
-    genai.configure(api_key=api_key)
+    logging.info(f"Loaded {len(API_KEY_POOL)} API Keys for rotation.")
+
+def get_current_key():
+    global current_key_index
+    if not API_KEY_POOL: return None
+    return API_KEY_POOL[current_key_index % len(API_KEY_POOL)]
+
+def rotate_key():
+    global current_key_index
+    current_key_index += 1
+    new_key = get_current_key()
+    logging.info(f"🔄 Rotating to API Key #{current_key_index % len(API_KEY_POOL) + 1} (Ends in ...{new_key[-4:]})")
+    genai.configure(api_key=new_key)
+    return new_key
+
+# Configure initial key
+if API_KEY_POOL:
+    genai.configure(api_key=get_current_key())
 
 # Generation Config
 generation_config = {
@@ -142,10 +158,19 @@ def check_consistency_llm(book_text_snippet, character, backstory):
         except Exception as e:
             logging.error(f"Error calling Gemini (Attempt {attempt+1}/{retries}): {e}")
             
-            # If Quota Exceeded, wait LONG time (Free Tier behavior)
+            # If Quota Exceeded (429), ROTATE KEY and RETRY immediately!
             if "429" in str(e) or "Quota" in str(e) or "quota" in str(e):
-                logging.warning("Quota Exceeded! (Rate Limit Hit). Sleeping for 65 seconds...")
-                time.sleep(65)
+                logging.warning(f"⚠️ Quota Hit on Key #{current_key_index % len(API_KEY_POOL) + 1}!")
+                
+                # If we have multiple keys, rotate and retry INSTANTLY
+                if len(API_KEY_POOL) > 1:
+                    rotate_key()
+                    # Don't sleep long, just enough to switch
+                    time.sleep(1) 
+                else:
+                    # If we only have 1 key, we MUST sleep
+                    logging.warning("🚫 No other keys to switch to. Sleeping 65s...")
+                    time.sleep(65)
             else:
                 # DEBUG: List available models to find the right name
                 try:

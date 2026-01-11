@@ -8,10 +8,12 @@ print("--- [STARTUP] Initializing Application... ---")
 from dotenv import load_dotenv
 load_dotenv()
 
-key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+# Handle single or multiple keys
+raw_keys = os.getenv("GEMINI_API_KEYS") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+key = raw_keys.split(",")[0].strip() if raw_keys else None
 
 if key:
-    print(f"--- [STARTUP] API Key Found: ...{key[-4:]} ---")
+    print(f"--- [STARTUP] API Key(s) Found. Using first key ending in ...{key[-4:]} ---")
     import google.generativeai as genai
     genai.configure(api_key=key)
     try:
