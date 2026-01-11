@@ -39,6 +39,8 @@ def get_working_model():
         return _ACTIVE_MODEL
 
     candidates = [
+        "gemini-2.0-flash-exp",
+        "gemini-exp-1206",
         "gemini-1.5-flash",
         "gemini-1.5-pro",
         "gemini-pro",

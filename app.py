@@ -8,9 +8,19 @@ print("--- [STARTUP] Initializing Application... ---")
 from dotenv import load_dotenv
 load_dotenv()
 
-key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 if key:
     print(f"--- [STARTUP] API Key Found: ...{key[-4:]} ---")
+    import google.generativeai as genai
+    genai.configure(api_key=key)
+    try:
+        print("--- [DIAGNOSTIC] Checking Available Models ---")
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        if models:
+            print(f"--- [DIAGNOSTIC] SUCCESS! Found {len(models)} models: {models} ---")
+        else:
+            print("--- [DIAGNOSTIC] WARNING: No models found! (Possible Region Block?) ---")
+    except Exception as e:
+        print(f"--- [DIAGNOSTIC] CHECK FAILED: {e} ---")
 else:
     print("--- [STARTUP] CRITICAL: NO API KEY FOUND IN ENVIRONMENT ---")
 
