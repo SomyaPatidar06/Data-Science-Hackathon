@@ -67,6 +67,13 @@ def get_working_model():
     
     logging.info("Starting Auto-Discovery for Working Gemini Model...")
     
+    # DIAGNOSTIC: List actually available models
+    try:
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        logging.info(f"DIAGNOSTIC: Available Models in this Region: {available}")
+    except Exception as e:
+        logging.error(f"DIAGNOSTIC: Failed to list models: {e}")
+
     for model_name in candidates:
         try:
             logging.info(f"Testing model: {model_name}...")

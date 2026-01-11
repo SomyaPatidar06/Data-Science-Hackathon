@@ -12,6 +12,21 @@ load_dotenv()
 raw_keys = os.getenv("GEMINI_API_KEYS") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 key = raw_keys.split(",")[0].strip() if raw_keys else None
 
+# --- Logging Setup (EARLY) ---
+import logging
+LOG_FILE = "app.log"
+# Force re-config to override any previous init
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
+
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filemode='w' # Overwrite each run
+)
+print(f"Logging configured to {LOG_FILE}...")
+
 if key:
     print(f"--- [STARTUP] API Key(s) Found. Using first key ending in ...{key[-4:]} ---")
     import google.generativeai as genai
