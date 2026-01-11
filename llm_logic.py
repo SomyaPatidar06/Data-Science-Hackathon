@@ -83,15 +83,9 @@ def check_consistency_llm(book_text_snippet, character, backstory):
     """
     Checks if the backstory is consistent with the book context.
     """
-    global LAST_CALL_TIME
-    
-    # 1. Enforce Rate Limit (Free tier is often ~15 RPM, so 4s delay is safe)
-    # Raising to 10s to be extra safe given the errors.
-    time_since_last = time.time() - LAST_CALL_TIME
-    if time_since_last < 10:
-        time.sleep(10 - time_since_last)
-    
-    LAST_CALL_TIME = time.time()
+    # Rate Limiter Removed for Paid Tier
+    # global LAST_CALL_TIME
+    # LAST_CALL_TIME = time.time()
     
     # Construct prompt
     prompt = f"""
@@ -139,10 +133,10 @@ def check_consistency_llm(book_text_snippet, character, backstory):
         except Exception as e:
             logging.error(f"Error calling Gemini (Attempt {attempt+1}/{retries}): {e}")
             
-            # If Quota Exceeded, wait LONG time (API said 50s, we do 65s)
+            # If Quota Exceeded (should rarely happen on Paid tier), just retry quickly
             if "429" in str(e) or "Quota" in str(e) or "quota" in str(e):
-                logging.warning("Quota Exceeded! Sleeping for 65 seconds...")
-                time.sleep(65)
+                logging.warning("Quota Hit (Paid Tier): Retrying in 2s...")
+                time.sleep(2)
             else:
                 # DEBUG: List available models to find the right name
                 try:
