@@ -8,6 +8,8 @@ print("--- [STARTUP] Initializing Application... ---")
 from dotenv import load_dotenv
 load_dotenv()
 
+key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
 if key:
     print(f"--- [STARTUP] API Key Found: ...{key[-4:]} ---")
     import google.generativeai as genai
