@@ -62,24 +62,36 @@ def get_working_model():
             _ACTIVE_MODEL = test_model
             return _ACTIVE_MODEL
         except Exception as e:
+            # If we get a Quota error (429), the model EXISTS! We just hit a limit.
+            # So we should use it, but wait a bit.
+            if "429" in str(e) or "Quota" in str(e) or "quota" in str(e):
+                logging.info(f"SUCCESS (Quota Hit): Found working model: {model_name}. Pausing 60s...")
+                time.sleep(60)
+                _ACTIVE_MODEL = test_model
+                return _ACTIVE_MODEL
+            
             logging.warning(f"Failed to load {model_name}: {e}")
             
     # If all fail:
     logging.error("CRITICAL: All model candidates failed.")
     raise RuntimeError("No available Gemini models found. Check API Key and Region.")
 
+# Rate Limiter Global
+LAST_CALL_TIME = 0
+
 def check_consistency_llm(book_text_snippet, character, backstory):
     """
     Checks if the backstory is consistent with the book context.
-    
-    Args:
-        book_text_snippet: The content of the novel (or relevant chunks).
-        character: Character name.
-        backstory: The hypothetical backstory to check.
-        
-    Returns:
-        dict: {"prediction": 0 or 1, "rationale": "reasoning..."}
     """
+    global LAST_CALL_TIME
+    
+    # 1. Enforce Rate Limit (Free tier is often ~15 RPM, so 4s delay is safe)
+    # Raising to 10s to be extra safe given the errors.
+    time_since_last = time.time() - LAST_CALL_TIME
+    if time_since_last < 10:
+        time.sleep(10 - time_since_last)
+    
+    LAST_CALL_TIME = time.time()
     
     # Construct prompt
     prompt = f"""
@@ -127,17 +139,22 @@ def check_consistency_llm(book_text_snippet, character, backstory):
         except Exception as e:
             logging.error(f"Error calling Gemini (Attempt {attempt+1}/{retries}): {e}")
             
-            # DEBUG: List available models to find the right name
-            try:
-                logging.info("--- Available Models ---")
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        logging.info(f"Model: {m.name}")
-                logging.info("------------------------")
-            except Exception as list_e:
-                logging.error(f"Could not list models: {list_e}")
+            # If Quota Exceeded, wait LONG time (API said 50s, we do 65s)
+            if "429" in str(e) or "Quota" in str(e) or "quota" in str(e):
+                logging.warning("Quota Exceeded! Sleeping for 65 seconds...")
+                time.sleep(65)
+            else:
+                # DEBUG: List available models to find the right name
+                try:
+                    logging.info("--- Available Models ---")
+                    for m in genai.list_models():
+                        if 'generateContent' in m.supported_generation_methods:
+                            logging.info(f"Model: {m.name}")
+                    logging.info("------------------------")
+                except Exception as list_e:
+                    logging.error(f"Could not list models: {list_e}")
 
-            time.sleep(2 * (attempt + 1))
+                time.sleep(5 * (attempt + 1))
             
     # Fallback on failure
     return {"prediction": 0, "rationale": "API Error or Timeout"}
