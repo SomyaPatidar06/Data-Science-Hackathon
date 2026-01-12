@@ -121,37 +121,98 @@ def process_row(book_name, character, backstory):
     return (result.get("prediction", 0), result.get("rationale", ""))
 
 # --- Pathway Pipeline ---
-def run_pipeline():
-    # 1. Read the CSV
-    ds = pw.io.csv.read(
-        INPUT_CSV,
-        schema=pw.schema_from_csv(INPUT_CSV),
-        mode="static"
-    )
+# --- Sequential Processing (Survival Mode) ---
+import pandas as pd
+import time
+import csv
 
-    # 2. Apply the LLM processing using pw.apply
-    # Renaming 'id' to 'record_id' because 'id' is reserved in Pathway
-    processed = ds.select(
-        record_id=ds.id, 
-        label=ds.label,
-        book_name=ds.book_name,
-        prediction_tuple=pw.apply(process_row, ds.book_name, ds.char, ds.content)
-    )
+def run_sequential_loop():
+    print("--- [SURVIVAL MODE] Starting Sequential Processing ---")
     
-    # 3. Flatten the tuple result
-    final_table = processed.select(
-        record_id=processed.record_id,
-        book_name=processed.book_name,
-        original_label=processed.label,
-        enc=processed.prediction_tuple[0],
-        rationale=processed.prediction_tuple[1]
-    )
+    # 1. Load Input Data
+    if not os.path.exists(INPUT_CSV):
+        logging.error(f"Input file not found: {INPUT_CSV}")
+        return
+        
+    df = pd.read_csv(INPUT_CSV)
+    total_rows = len(df)
+    print(f"--- Loaded {total_rows} rows from {INPUT_CSV} ---")
 
-    # 4. Output to CSV
-    pw.io.csv.write(final_table, OUTPUT_CSV)
+    # 2. Check for Resume (Load existing Output)
+    processed_ids = set()
+    if os.path.exists(OUTPUT_CSV):
+        try:
+            existing_df = pd.read_csv(OUTPUT_CSV)
+            # Ensure we only track valid IDs
+            if 'id' in existing_df.columns:
+                processed_ids = set(existing_df['id'].astype(str))
+            elif 'record_id' in existing_df.columns:
+                 processed_ids = set(existing_df['record_id'].astype(str))
+            
+            print(f"--- Found outputs. Resuming! Skipping {len(processed_ids)} already processed rows. ---")
+        except Exception as e:
+            print(f"--- Warning: Could not read existing results ({e}). Starting from scratch. ---")
 
-    # Run!
-    pw.run()
+    # 3. Setup CSV Writer (Append Mode)
+    write_header = not os.path.exists(OUTPUT_CSV) or os.stat(OUTPUT_CSV).st_size == 0
+    
+    fieldnames = ['id', 'book_name', 'original_label', 'enc', 'rationale']
+    
+    with open(OUTPUT_CSV, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if write_header:
+            writer.writeheader()
+
+        # 4. Iterate and Process
+        for index, row in df.iterrows():
+            row_id = str(row['id'])
+            
+            if row_id in processed_ids:
+                # print(f"Skipping ID {row_id} (Done)")
+                continue
+
+            print(f"Processing Row {index + 1}/{total_rows} (ID: {row_id})...")
+            
+            # --- LOGIC CALL ---
+            try:
+                # Book Content Lookup
+                lookup_name = str(row['book_name']).strip().lower()
+                context = books_content.get(lookup_name, "")
+                
+                prediction = 0
+                rationale = "Error/Not Found"
+
+                if not context:
+                    logging.error(f"Book not found: {row['book_name']}")
+                    rationale = f"Book '{row['book_name']}' not found in library."
+                elif not row['content']: # Backstory
+                    rationale = "No backstory provided."
+                else:
+                    # Actual LLM Call
+                    result = check_consistency_llm(context, row['char'], row['content'])
+                    prediction = result.get("prediction", 0)
+                    rationale = result.get("rationale", "")
+
+                # SAVE IMMEDIATELY
+                writer.writerow({
+                    'id': row_id,
+                    'book_name': row['book_name'],
+                    'original_label': row['label'],
+                    'enc': prediction,
+                    'rationale': rationale
+                })
+                f.flush() # CRITICAL: Ensure it is on disk
+                logging.info(f"Row {row_id} Saved. Result: {prediction}")
+                
+                # --- THROTTLE (Crucial for RPM Limits) ---
+                print("Sleeping 12s to respect RPM...")
+                time.sleep(12) 
+
+            except Exception as e:
+                logging.error(f"CRITICAL ERROR on Row {row_id}: {e}")
+                print(f"Skipping Row {row_id} due to error.")
+
+    print("--- Processing Complete! ---")
 
 if __name__ == "__main__":
-    run_pipeline()
+    run_sequential_loop()
