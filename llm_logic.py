@@ -69,9 +69,10 @@ def get_working_model():
         return _ACTIVE_MODEL
 
     candidates = [
-        "gemini-2.0-flash",          # Stable 2.0 (Verified Available)
-        "gemini-2.5-flash",          # Newer 2.5 (Verified Available)
-        "gemini-flash-latest",       # Generic Alias
+        "gemini-2.0-flash-lite",     # LITE VERSION (Often higher limits/faster)
+        "gemini-2.0-flash-lite-preview-02-05", 
+        "gemini-2.0-flash",          # Stable 2.0
+        "gemini-2.5-flash",          # Newer 2.5
         "gemini-exp-1206",           # Fallback
         "gemini-2.0-flash-exp",      # Known to have Limit 0 (Last resort)
         "gemini-pro"                 # Fallback
